@@ -6,6 +6,10 @@ const path = require('path');
 
 dotenv.config();
 
+// Debug: log which env vars are loaded (values hidden for security)
+console.log('ENV CHECK - RAZORPAY_KEY_ID:', process.env.RAZORPAY_KEY_ID ? 'SET' : 'MISSING');
+console.log('ENV CHECK - RAZORPAY_KEY_SECRET:', process.env.RAZORPAY_KEY_SECRET ? 'SET' : 'MISSING');
+
 const app = express();
 
 app.use(cors());
@@ -21,6 +25,12 @@ app.use('/api/complaints', require('./routes/complaintRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/feedback', require('./routes/feedbackRoutes'));
+
+// Global error handler — logs all unhandled errors to Render logs
+app.use((err, req, res, next) => {
+  console.error('SERVER ERROR:', err.message);
+  res.status(500).json({ message: err.message });
+});
 
 // Serve frontend static files
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
