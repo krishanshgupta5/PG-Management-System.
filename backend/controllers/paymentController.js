@@ -84,8 +84,9 @@ const createOrder = async (req, res) => {
       keyId: process.env.RAZORPAY_KEY_ID,
     });
   } catch (error) {
-    console.error('CREATE ORDER ERROR:', error.message);
-    res.status(500).json({ message: error.message });
+    console.error('CREATE ORDER ERROR FULL:', JSON.stringify(error));
+    const message = error?.error?.description || error?.message || 'Unknown error from Razorpay';
+    res.status(500).json({ message });
   }
 };
 
