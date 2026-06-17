@@ -248,7 +248,7 @@ const LandlordDashboard = () => {
                           <div style={{ color: 'var(--text-secondary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             ID Proof: 
                             {tenant.idProof ? (
-                              <a href={tenant.idProof} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'underline' }}>
+                              <a href={`${import.meta.env.VITE_API_BASE_URL || ''}${tenant.idProof}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'underline' }}>
                                 View Document
                               </a>
                             ) : (

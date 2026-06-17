@@ -15,6 +15,7 @@ export const AuthProvider = ({ children }) => {
           const res = await axios.get('/api/auth/me', {
             headers: { Authorization: `Bearer ${token}` }
           });
+          // Use the full populated user from /me so rentDue, room, property are fresh
           setUser(res.data);
         } catch (error) {
           console.error('Failed to fetch user', error);
@@ -30,8 +31,19 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const res = await axios.post('/api/auth/login', { email, password });
     localStorage.setItem('token', res.data.token);
-    setUser(res.data);
-    return res.data;
+    // Immediately fetch the full populated user from /me so that
+    // property.name, room, and rentDue are all available right away
+    // without needing to close and reopen the site.
+    try {
+      const meRes = await axios.get('/api/auth/me', {
+        headers: { Authorization: `Bearer ${res.data.token}` }
+      });
+      setUser(meRes.data);
+      return meRes.data;
+    } catch {
+      setUser(res.data);
+      return res.data;
+    }
   };
 
   const register = async (userData) => {

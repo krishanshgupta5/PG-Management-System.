@@ -11,7 +11,7 @@ const TenantDashboard = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [rentDue, setRentDue] = useState(user?.rentDue || 0);
+  const [rentDue, setRentDue] = useState(0);
 
   // Browsing state
   const [searchLocality, setSearchLocality] = useState('');
@@ -19,6 +19,14 @@ const TenantDashboard = () => {
   const [availableProperties, setAvailableProperties] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
+
+  // Sync rentDue reactively from user so it always reflects the latest value,
+  // even when user is set after login (useState initial value only runs once at mount).
+  useEffect(() => {
+    if (user?.rentDue !== undefined) {
+      setRentDue(user.rentDue);
+    }
+  }, [user?.rentDue]);
 
   useEffect(() => {
     fetchNotifications();
@@ -113,26 +121,95 @@ const TenantDashboard = () => {
     }
   };
 
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      if (document.getElementById('razorpay-script')) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement('script');
+      script.id = 'razorpay-script';
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const handlePayment = async (e) => {
     e.preventDefault();
     setIsPaying(true);
     try {
-      // Simulate Payment Gateway Delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Load Razorpay checkout script
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        alert('Failed to load Razorpay. Please check your internet connection.');
+        setIsPaying(false);
+        return;
+      }
 
-      const res = await axios.post('/api/payments', { amount: Number(paymentAmount) }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      // Step 1: Create order on the backend
+      const orderRes = await axios.post('/api/payments/create-order',
+        { amount: Number(paymentAmount) },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+
+      const { orderId, amount: orderAmount, currency, paymentId, keyId } = orderRes.data;
+
+      // Step 2: Open Razorpay checkout
+      const options = {
+        key: keyId,
+        amount: orderAmount,
+        currency,
+        name: 'Gram PG',
+        description: 'Rent Payment',
+        order_id: orderId,
+        handler: async (response) => {
+          try {
+            // Step 3: Verify payment on the backend
+            const verifyRes = await axios.post('/api/payments/verify', {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              paymentId,
+            }, {
+              headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+            });
+            setRentDue(verifyRes.data.rentDue);
+            setPaymentAmount('');
+            alert(`Payment Successful! Transaction ID: ${response.razorpay_payment_id}`);
+          } catch (err) {
+            alert('Payment verification failed. Please contact support.');
+          }
+        },
+        prefill: {
+          name: user?.name,
+          email: user?.email,
+        },
+        theme: {
+          color: '#6366f1',
+        },
+        modal: {
+          ondismiss: () => {
+            setIsPaying(false);
+          }
+        }
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', (response) => {
+        alert(`Payment Failed: ${response.error.description}`);
+        setIsPaying(false);
       });
-      setRentDue(res.data.rentDue);
-      setPaymentAmount('');
-      alert('Payment successful! Transaction ID: TXN-' + Math.random().toString(36).substr(2, 9).toUpperCase());
+      rzp.open();
     } catch (error) {
       console.error(error);
-      alert('Payment failed.');
+      alert(error.response?.data?.message || 'Failed to initiate payment.');
     } finally {
       setIsPaying(false);
     }
   };
+
 
   if (!user) return null;
 

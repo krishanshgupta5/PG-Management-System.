@@ -86,7 +86,9 @@ const authUser = async (req, res) => {
   try {
     const { email, password } = req.body; // email here can be username or email
 
-    const user = await User.findOne({ $or: [{ email: email }, { username: email }] });
+    const user = await User.findOne({ $or: [{ email: email }, { username: email }] })
+      .populate('property')
+      .populate('room');
 
     if (user && (await bcrypt.compare(password, user.password))) {
       res.json({
@@ -96,6 +98,8 @@ const authUser = async (req, res) => {
         username: user.username,
         role: user.role,
         property: user.property,
+        room: user.room,
+        rentDue: user.rentDue,
         approvalStatus: user.approvalStatus,
         rejectionNote: user.rejectionNote,
         token: generateToken(user._id),
