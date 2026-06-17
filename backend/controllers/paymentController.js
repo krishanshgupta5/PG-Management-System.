@@ -5,10 +5,17 @@ const User = require('../models/User');
 const Property = require('../models/Property');
 const Notification = require('../models/Notification');
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+// Helper to get a Razorpay instance — initialized lazily so missing keys
+// don't crash the entire server on startup.
+const getRazorpay = () => {
+  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    throw new Error('Razorpay keys are not configured in environment variables.');
+  }
+  return new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+  });
+};
 
 // GET /api/payments - Fetch payment history
 const getPayments = async (req, res) => {
@@ -58,7 +65,7 @@ const createOrder = async (req, res) => {
       },
     };
 
-    const order = await razorpay.orders.create(options);
+    const order = await getRazorpay().orders.create(options);
 
     // Create a pending payment record
     const payment = await Payment.create({
